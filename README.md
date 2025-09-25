@@ -15,3 +15,5 @@ By default the script is looking at production and specifically the file `config
 ## Run
 
 Execute `npm run start` and it will run the script which will output to the console as well as write to a file `output.json`.
+
+![Console output after running](screenshot.png)
