@@ -1,7 +1,10 @@
 require('dotenv').config();
+const fs = require('fs');
+
+// Sample subset of 6 showscases from production account
+const showcaseIds = require('./example.json');
 
 const Vimeo = require('@vimeo/vimeo').Vimeo;
-const util = require('util');
 let config = {};
 
 try {
@@ -15,54 +18,48 @@ try {
 
 const lib = new Vimeo(config.client_id, config.client_secret, config.access_token);
 
-const makeRequest = function(lib, showcaseId) {
-  // Make an API request
-  lib.request({
-    // This is the path for the videos contained within the staff picks channels
-    path: `/me/albums/${showcaseId}/videos`,
+const makeRequest = async (showcase) => lib.request({
+    path: `/me/albums/${showcase.id}/videos`,
     query: {
       per_page: 100,
       sort: 'default',
       fields: 'uri,name,description,pictures.sizes'
     }
-  }, function (error, body, statusCode, headers) {
-    if (error) {
-      console.log('error');
-      console.log(error);
-    } else {
-      console.log('body');
-      console.log(util.inspect(body, false, null));
-    }
-
-    console.log('status code');
-    console.log(statusCode);
-    console.log('headers');
-    console.log(headers);
   });
-}
 
-// Asthma: 3959551
-// Cancer: 3959527
-// Central Line: 3959541
-// Clinical Trials: 3959544
-// Diabetes: 3959539
-// G-Tube: 3959530
-const showcaseIds = [3959551, 3959527, 3959541, 3959544, 3959539, 3959530];
+const requestedData = [];
 
 if (config.access_token) {
-  lib.setAccessToken(config.access_token);
-  
-  showcaseIds.forEach(showcase => makeRequest(lib, showcase));
-} else {
-  // Unauthenticated API requests must request an access token. You should not request a new access
-  // token for each request, you should request an access token once and use it over and over.
-  lib.generateClientCredentials('public', function (err, response) {
-    if (err) {
-      throw err;
-    }
+	lib.setAccessToken(config.access_token);
 
-    // Assign the access token to the library.
-    lib.setAccessToken(response.access_token);
-    showcaseIds.forEach(showcase_id => makeRequest(lib, showcase_id));
-  });
+	try {
+		showcaseIds.forEach(async showcase => {
+			const response = await makeRequest(showcase);
+
+			requestedData.push({
+				id: showcase.id,
+				title: showcase.title,
+				data: {
+					uri: response.body.data[0].uri,
+					name: response.body.data[0].name,
+					description: response.body.data[0].description,
+					thumbnail: response.body.data[0].pictures.sizes[response.body.data[0].pictures.sizes.length - 1]
+				}
+			});
+
+			if (showcaseIds.length === requestedData.length) {
+				fs.writeFileSync('./output.json', JSON.stringify(requestedData, null, 2));
+
+				console.log(requestedData);
+				console.log('');
+				console.log('--------------------');
+				console.log('');
+				console.log('DONE!');
+				console.log('Output File: ./output.json');
+			}
+		});
+	} catch (error) {
+		console.error(`ERROR: ${error}`);
+		process.exit();
+	}
 }
